@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+st.set_page_config(
+    page_title="Login - Sistema Gestor",
+    page_icon="🔐",
+    layout="centered"
+)
+
 # Formato esperado no .env:
 # APP_USERS=gestor1:hash1,gestor2:hash2
 APP_USERS_RAW = os.getenv("APP_USERS", "")
@@ -46,11 +52,11 @@ def check_login() -> tuple[bool, str | None]:
     if st.session_state.get("authenticated", False):
         return True, st.session_state.get("username")
 
-    st.markdown("## Acesso do gestor")
+    st.markdown('<h2 class="login-title">🔐 Acesso do gestor</h2>', unsafe_allow_html=True)
 
     with st.form("login_form"):
-        username = st.text_input("Login")
-        password = st.text_input("Senha", type="password")
+        username = st.text_input("Login", placeholder="Usuário")
+        password = st.text_input("Senha", type="password", placeholder="Digite sua senha")
         submitted = st.form_submit_button("Entrar", use_container_width=True)
 
     if submitted:

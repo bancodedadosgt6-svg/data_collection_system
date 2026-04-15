@@ -17,7 +17,7 @@ def main() -> None:
     load_css("style.css")
 
     st.title(APP_TITLE)
-    st.caption(APP_SUBTITLE)
+    st.markdown(f'<p class="app-subtitle">{APP_SUBTITLE}</p>', unsafe_allow_html=True)
 
     authenticated, current_user = check_login()
 
@@ -28,7 +28,7 @@ def main() -> None:
     with top_col1:
         st.success(f"Acesso liberado para: **{current_user}**")
     with top_col2:
-        if st.button("Sair", use_container_width=True):
+        if st.button("Sair", type="secondary", use_container_width=True):
             logout()
             st.rerun()
 
@@ -43,7 +43,11 @@ def main() -> None:
             "o arquivo para a pasta configurada no Google Drive."
         )
 
-        if st.button("Enviar arquivo tratado para o Google Drive", use_container_width=True):
+        if st.button(
+            "Enviar arquivo tratado para o Google Drive",
+            type="primary",
+            use_container_width=True,
+        ):
             try:
                 uploaded_name = upload_dataframe_to_drive(
                     df=df_result,

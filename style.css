@@ -1,14 +1,14 @@
 :root {
     --bg-main: #f8fbff;
-    --bg-card: rgba(255, 255, 255, 0.88);
+    --bg-card: #B9F8CF;
     --bg-sidebar: linear-gradient(180deg, #fff9e8 0%, #f4f9ff 48%, #eef6ff 100%);
-    --text-main: #16324f;
-    --text-soft: #46627c;
+    --text-main: #000000;
+    --text-soft: #002e0b; 
     --blue-1: #2f80c1;
-    --blue-2: #4ea3d9;
+    --blue-1: #00ACFF;
     --yellow-1: #f4c542;
     --yellow-2: #ffe08a;
-    --border-soft: rgba(47, 128, 193, 0.14);
+    --border-soft: rgba(0, 0, 0, 0.14);
     --shadow-soft: 0 8px 24px rgba(32, 74, 135, 0.10);
     --success-bg: #eef9f1;
     --success-border: #8bc89a;
@@ -19,16 +19,25 @@ html, body, [class*="css"] {
     color: var(--text-main);
 }
 
+.app-subtitle {
+    font-family: "Trebuchet MS", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 1.04rem;
+    font-weight: 600;
+    color: var(--text-soft);
+    margin-top: -0.25rem;
+    margin-bottom: 1.15rem;
+}
+
 .stApp {
     background:
         radial-gradient(circle at top left, rgba(255, 224, 138, 0.28), transparent 22%),
         radial-gradient(circle at top right, rgba(78, 163, 217, 0.18), transparent 20%),
-        linear-gradient(180deg, #fffdf8 0%, var(--bg-main) 100%);
+        linear-gradient(180deg, #DCFCE7 0%, var(--bg-main) 100%);
 }
 
 .block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 2rem;
+    margin: 0 auto;
+    padding-top: 5rem;
     max-width: 1200px;
 }
 
@@ -40,6 +49,11 @@ h1, h2, h3 {
 
 p, li, label, span {
     color: var(--text-soft);
+} 
+
+.login-title {
+    text-align: center;
+    margin: 2rem 0 1rem;
 }
 
 [data-testid="stSidebar"] {
@@ -54,13 +68,21 @@ p, li, label, span {
 div[data-testid="stForm"] {
     background: var(--bg-card);
     border: 1px solid var(--border-soft);
-    border-radius: 18px;
-    padding: 1rem 1rem 0.3rem 1rem;
+    border-radius: 20px;
+    width: min(500px, 100%);
+    margin: auto;
+    padding: 1rem;
     box-shadow: var(--shadow-soft);
 }
 
+div[data-testid="stForm"] .stTextInput label p {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+
 div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stAlert"]) {
-    border-radius: 14px;
+    border-radius: 12px;
 }
 
 [data-testid="stAlert"] {
@@ -75,35 +97,69 @@ div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stAlert"]) {
     box-shadow: var(--shadow-soft);
 }
 
-.stButton > button,
+.stButton > button[kind="primary"],
 .stDownloadButton > button,
 .stFormSubmitButton > button {
     width: 100%;
     border-radius: 12px;
     border: none;
-    font-weight: 600;
     padding: 0.7rem 1rem;
-    background: linear-gradient(90deg, var(--blue-1) 0%, var(--blue-2) 100%);
-    color: white;
+    background: #05DF72;
+    color: rgb(255, 255, 255);
     box-shadow: 0 6px 18px rgba(47, 128, 193, 0.22);
     transition: all 0.2s ease;
 }
 
-.stButton > button:hover,
+.stButton > button[kind="primary"]:hover,
 .stDownloadButton > button:hover,
 .stFormSubmitButton > button:hover {
     transform: translateY(-1px);
-    filter: brightness(1.03);
+    background: #00A63E;
+}
+
+.stButton > button[kind="secondary"] {
+    width: 100%;
+    border-radius: 12px;
+    border: 2px solid #00ACFF;
+    padding: 0.7rem 1rem;
+    background: #ffffff;
+    color: #00ACFF !important;
+    box-shadow: 0 3px 10px rgba(47, 128, 193, 0.15);
+    transition: all 0.2s ease;
+}
+
+.stButton > button[kind="secondary"] p,
+.stButton > button[kind="secondary"] span {
+    color: #2f80c1 !important;
+    font-weight: 600 !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    transform: translateY(-1px);
+    background: #eef6ff;
+    border-color: #00ACFF;
+    color: #00ACFF !important;
+}
+
+.stButton > button[kind="secondary"]:hover p,
+.stButton > button[kind="secondary"]:hover span {
+    color: #00ACFF!important;
+    font-weight: 700 !important;
 }
 
 .stTextInput > div > div > input,
 .stSelectbox > div > div,
 .stTextArea textarea,
 [data-baseweb="select"] > div {
-    border-radius: 12px !important;
+    border-radius: 1px !important;
     border: 1px solid rgba(47, 128, 193, 0.18) !important;
-    background: rgba(255, 255, 255, 0.95) !important;
+    background: #ffffff !important;
     color: var(--text-main) !important;
+}
+.stTextInput > div > div > input::placeholder {
+    color: #BCBEC0;
+    font-size: 0.90rem;
+    font-weight: 400;
 }
 
 [data-testid="stFileUploader"] {
