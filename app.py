@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from acess import check_login, logout
-from obter_data import render_obter_data
+from obter_data_csv import render_obter_data
 from settings import APP_TITLE, APP_SUBTITLE, load_css, upload_dataframe_to_drive
 
 st.set_page_config(
