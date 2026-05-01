@@ -26,7 +26,7 @@ def main() -> None:
 
     top_col1, top_col2 = st.columns([8, 2])
     with top_col1:
-        st.success(f"Acesso liberado para: **{current_user}**")
+        st.success(f"✔ Acesso liberado para: **{current_user}**")
     with top_col2:
         if st.button("Sair", type="secondary", use_container_width=True):
             logout()

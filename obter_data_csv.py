@@ -189,18 +189,21 @@ def render_upload_pdf():
             else:
                 st.warning("Nenhuma tabela encontrada.")
 
-
 def render_obter_data():
     """
     Mantém a lógica original do obter_data.py e retorna:
     - dataframe tratado
     - nome sugerido para o arquivo final
     """
-    st.sidebar.title("MENU")
-    pagina = st.sidebar.radio(
-        label="Ir para:",
-        options=["Página Inicial", "Análise", "Upload PDF"]
-    )
+    with st.sidebar:
+        st.image("./assets/logo2.PNG", width=200)
+
+        st.markdown("# MENU")
+
+        pagina = st.radio(
+            "Ir para:",
+            ["Página Inicial", "Análise", "Upload PDF"]
+        )
     
     if pagina == "Upload PDF":
         render_upload_pdf()

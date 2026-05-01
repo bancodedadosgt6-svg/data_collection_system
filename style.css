@@ -1,12 +1,12 @@
 :root {
-    --bg-main: #f8fbff;
+    --bg-main: #f2fcf6;
     --bg-card: #B9F8CF;
-    --bg-sidebar: linear-gradient(180deg, #fff9e8 0%, #f4f9ff 48%, #eef6ff 100%);
+    --bg-sidebar: #3B4E8C;
     --text-main: #000000;
     --text-soft: #002e0b; 
-    --blue-1: #2f80c1;
-    --blue-1: #00ACFF;
-    --yellow-1: #f4c542;
+    --blue-1: #2C3A6B;
+    --blue-2: #00ACFF;
+    --yellow-1: #F2C94C;
     --yellow-2: #ffe08a;
     --border-soft: rgba(0, 0, 0, 0.14);
     --shadow-soft: 0 8px 24px rgba(32, 74, 135, 0.10);
@@ -32,7 +32,7 @@ html, body, [class*="css"] {
     background:
         radial-gradient(circle at top left, rgba(255, 224, 138, 0.28), transparent 22%),
         radial-gradient(circle at top right, rgba(78, 163, 217, 0.18), transparent 20%),
-        linear-gradient(180deg, #DCFCE7 0%, var(--bg-main) 100%);
+        linear-gradient(180deg, #e6fff0 0%, var(--bg-main) 100%);
 }
 
 .block-container {
@@ -51,6 +51,10 @@ p, li, label, span {
     color: var(--text-soft);
 } 
 
+label, span {
+    color: var(--blue-1);
+} 
+
 .login-title {
     text-align: center;
     margin: 2rem 0 1rem;
@@ -58,13 +62,83 @@ p, li, label, span {
 
 [data-testid="stSidebar"] {
     background: var(--bg-sidebar);
-    border-right: 1px solid rgba(244, 197, 66, 0.25);
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* ESCONDE AS BOLINHAS */
+[data-testid="stSidebar"] div[role="radiogroup"] [data-baseweb="radio"] > div:first-child {
+    display: none !important;
+}
+
+section[data-testid="stSidebar"] * {
+    color: white !important;
+}
+
+/* CONTAINER DOS ITENS */
+    div[role="radiogroup"] {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+div[role="radiogroup"] label {
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    display: block;
+    cursor: pointer;
+    color: #ffffff !important;
+    width: 160%;
+    background: rgba(255,255,255,0.05);
+    box-sizing: border-box;
+}
+
+div[role="radiogroup"] label > div {
+    padding: 0 !important;
 }
 
 [data-testid="stSidebar"] p {
     font-size: 0.98rem;
     font-weight: 600;
     font-family: "Trebuchet MS", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    color: #ffffff;
+}
+
+section[data-testid="stSidebar"] h1 {
+    color: #F2C94C !important;
+    margin-top: 20px;
+}
+
+div[role="radiogroup"] label:has(input:checked) {
+    background: #F2C94C !important;
+    color: #2C3A6B !important;
+    font-weight: 600;
+}
+
+div[role="radiogroup"] label:has(input:checked) p {
+    color: #2C3A6B !important;
+}
+
+div[role="radiogroup"] label:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+div[role="radiogroup"] input:checked + div {
+    background: #F2C94C !important;
+    color: #2C3A6B !important;
+    font-weight: 600;
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+}
+
+div[role="radiogroup"] input:checked + div p {
+    color: #2C3A6B !important;
+}
+
+section[data-testid="stSidebar"] hr {
+    display: none;
 }
 
 [data-testid="stSidebar"] .block-container {
