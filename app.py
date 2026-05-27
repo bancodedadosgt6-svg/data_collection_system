@@ -42,69 +42,28 @@ def obter_ubs_destino(df_result: pd.DataFrame) -> str:
     return ubs
 
 
-def obter_categoria_preview(df_result: pd.DataFrame) -> str:
+def render_area_envio_drive(df_result: pd.DataFrame, file_name: str | None = None) -> None:
     """
-    Identifica a categoria apenas para exibição na prévia técnica.
-    """
-    if df_result is None or df_result.empty:
-        return "Não identificada"
-
-    if "Categoria" in df_result.columns:
-        categoria = df_result["Categoria"].iloc[0]
-    elif "categoria" in df_result.columns:
-        categoria = df_result["categoria"].iloc[0]
-    else:
-        return "Série histórica ou não informada"
-
-    categoria = str(categoria).strip()
-
-    return categoria if categoria else "Não informada"
-
-
-def render_area_envio_drive(df_result: pd.DataFrame, file_name: str | None) -> None:
-    """
-    Renderiza a área de alimentação do banco XLSX no Google Drive.
+    Renderiza a área final de submissão dos dados tratados.
+    Interface limpa para o usuário final.
     """
     st.markdown("### Alimentação do banco da UBS")
 
-    st.info(
-        "Depois de revisar os dados tratados, clique no botão abaixo para alimentar "
-        "o banco XLSX da UBS no Google Drive. Os dados antigos serão preservados."
-    )
-
-    with st.expander("Prévia técnica do envio", expanded=False):
-        try:
-            ubs_preview = obter_ubs_destino(df_result)
-            categoria_preview = obter_categoria_preview(df_result)
-
-            st.write(
-                {
-                    "UBS de destino": ubs_preview,
-                    "Categoria": categoria_preview,
-                    "Arquivo tratado": file_name or "Arquivo tratado em memória",
-                    "Linhas novas": len(df_result),
-                    "Colunas recebidas": list(df_result.columns),
-                }
-            )
-
-        except Exception as e:
-            st.warning(f"Não foi possível montar a prévia técnica: {e}")
-
     if st.button(
-        "Alimentar banco XLSX da UBS no Google Drive",
+        "Submeter dados",
         type="primary",
         use_container_width=True,
     ):
         try:
             ubs_destino = obter_ubs_destino(df_result)
 
-            with st.spinner("Conectando ao Google Drive e alimentando o banco XLSX..."):
+            with st.spinner("Submetendo dados..."):
                 resultado = alimentar_banco_xlsx_drive(
                     df_novo=df_result,
                     ubs=ubs_destino,
                 )
 
-            st.success("Banco XLSX alimentado com sucesso!")
+            st.success(f"Dados da UBS {resultado['ubs']} submetidos com sucesso!")
 
             col1, col2, col3 = st.columns(3)
 
@@ -117,20 +76,8 @@ def render_area_envio_drive(df_result: pd.DataFrame, file_name: str | None) -> N
             with col3:
                 st.metric("Total atual", resultado["linhas_totais"])
 
-            st.write(
-                {
-                    "UBS": resultado["ubs"],
-                    "Pasta": resultado["pasta"],
-                    "Arquivo": resultado["arquivo"],
-                    "Aba": resultado["aba"],
-                    "Arquivo criado agora": "Sim"
-                    if resultado["arquivo_criado"]
-                    else "Não",
-                }
-            )
-
         except Exception as e:
-            st.error(f"Erro ao alimentar banco XLSX no Google Drive: {e}")
+            st.error(f"Erro ao submeter dados: {e}")
 
 
 def main() -> None:

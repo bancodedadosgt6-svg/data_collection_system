@@ -286,8 +286,8 @@ def render_upload_pdf():
 
             st.dataframe(df_final, use_container_width=True)
 
-            st.markdown("### Nome do arquivo tratado")
-            st.code(file_name)
+            # st.markdown("### Nome do arquivo tratado")
+            # st.code(file_name)
 
             return df_final, file_name
 
@@ -436,8 +436,8 @@ def render_obter_data():
         st.success("Dados carregados com sucesso!")
         st.dataframe(df, use_container_width=True)
 
-        st.markdown("### Nome do arquivo tratado")
-        st.code(file_name)
+        # st.markdown("### Nome do arquivo tratado")
+        # st.code(file_name)
 
         return df, file_name
 
