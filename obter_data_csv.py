@@ -286,14 +286,212 @@ def render_upload_pdf():
 
             st.dataframe(df_final, use_container_width=True)
 
-            # st.markdown("### Nome do arquivo tratado")
-            # st.code(file_name)
-
             return df_final, file_name
 
     except Exception as e:
         st.error(f"Erro ao processar o PDF: {e}")
         return None, None
+
+
+def get_file_extension(uploaded_file) -> str:
+    """
+    Retorna a extensão do arquivo enviado.
+    """
+    if uploaded_file is None or not uploaded_file.name:
+        return ""
+
+    return uploaded_file.name.lower().split(".")[-1].strip()
+
+
+def detectar_acs_csv(raw_bytes: bytes) -> bool:
+    """
+    Mantém a regra original do CSV:
+    procura ACS na linha 12 do arquivo bruto.
+    """
+    linhas = raw_bytes.splitlines()
+
+    if len(linhas) < 12:
+        return False
+
+    linha_12 = linhas[11].decode("latin-1", errors="ignore")
+    return "ACS" in linha_12.upper()
+
+
+def detectar_acs_excel(raw_bytes: bytes) -> bool:
+    """
+    Tenta detectar ACS nas primeiras linhas do XLSX/XLS.
+    """
+    try:
+        df_preview = pd.read_excel(
+            io.BytesIO(raw_bytes),
+            header=None,
+            nrows=15,
+        )
+
+        texto_preview = " ".join(
+            df_preview.fillna("").astype(str).values.flatten().tolist()
+        )
+
+        return "ACS" in texto_preview.upper()
+
+    except Exception:
+        return False
+
+
+def ler_csv_tratado(
+    raw_bytes: bytes,
+    tipo_relatorio: str,
+    ubs: str,
+    profissional: str | None,
+) -> tuple[pd.DataFrame | None, str | None]:
+    """
+    Lê e trata arquivo CSV mantendo a lógica original.
+    """
+    linhas = raw_bytes.splitlines()
+
+    if len(linhas) < 12:
+        st.error("O arquivo enviado não possui a estrutura mínima esperada.")
+        return None, None
+
+    is_acs = detectar_acs_csv(raw_bytes)
+    upload_buffer = io.BytesIO(raw_bytes)
+
+    if tipo_relatorio == "Série histórica (relatório geral)":
+        df = pd.read_csv(
+            upload_buffer,
+            encoding="latin-1",
+            sep=";",
+            skiprows=19,
+        )
+
+        df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
+        df["UBS"] = ubs
+
+        colunas = ["UBS"] + [c for c in df.columns if c != "UBS"]
+        df = df[colunas]
+
+        file_name = build_output_filename(
+            ubs=ubs,
+            profissional="serie_historica",
+        )
+
+        return df, file_name
+
+    df = pd.read_csv(
+        upload_buffer,
+        encoding="latin-1",
+        sep=";",
+        skiprows=18,
+    )
+
+    df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
+
+    if len(df) < 27:
+        st.error("O arquivo não possui linhas suficientes após o cabeçalho esperado.")
+        return None, None
+
+    df_linha44 = df.iloc[26:].copy()
+
+    if is_acs:
+        if "Tipo" not in df.columns:
+            st.error("A coluna 'Tipo' não foi encontrada no arquivo.")
+            return None, None
+
+        dfcadastro = df[df["Tipo"] == "Cadastro individual"].copy()
+        df = pd.concat([dfcadastro, df_linha44], ignore_index=True)
+
+    else:
+        df = df_linha44.copy()
+
+    df["UBS"] = ubs
+    df["Categoria"] = profissional
+
+    colunas = ["UBS", "Categoria"] + [
+        c for c in df.columns if c not in ["UBS", "Categoria"]
+    ]
+    df = df[colunas]
+
+    file_name = build_output_filename(
+        ubs=ubs,
+        profissional=profissional or "profissional_nao_informado",
+    )
+
+    return df, file_name
+
+
+def ler_excel_tratado(
+    raw_bytes: bytes,
+    tipo_relatorio: str,
+    ubs: str,
+    profissional: str | None,
+) -> tuple[pd.DataFrame | None, str | None]:
+    """
+    Lê e trata arquivo XLSX/XLS usando a mesma regra estrutural do CSV.
+
+    Observação:
+    - Para série histórica, usa skiprows=19.
+    - Para produção individual, usa skiprows=18.
+    - Mantém a regra original da linha 44 usando índice 26 após skiprows=18.
+    """
+    is_acs = detectar_acs_excel(raw_bytes)
+
+    if tipo_relatorio == "Série histórica (relatório geral)":
+        df = pd.read_excel(
+            io.BytesIO(raw_bytes),
+            skiprows=19,
+        )
+
+        df = df.loc[:, ~df.columns.astype(str).str.contains("^Unnamed")]
+        df["UBS"] = ubs
+
+        colunas = ["UBS"] + [c for c in df.columns if c != "UBS"]
+        df = df[colunas]
+
+        file_name = build_output_filename(
+            ubs=ubs,
+            profissional="serie_historica",
+        )
+
+        return df, file_name
+
+    df = pd.read_excel(
+        io.BytesIO(raw_bytes),
+        skiprows=18,
+    )
+
+    df = df.loc[:, ~df.columns.astype(str).str.contains("^Unnamed")]
+
+    if len(df) < 27:
+        st.error("O arquivo não possui linhas suficientes após o cabeçalho esperado.")
+        return None, None
+
+    df_linha44 = df.iloc[26:].copy()
+
+    if is_acs:
+        if "Tipo" not in df.columns:
+            st.error("A coluna 'Tipo' não foi encontrada no arquivo.")
+            return None, None
+
+        dfcadastro = df[df["Tipo"] == "Cadastro individual"].copy()
+        df = pd.concat([dfcadastro, df_linha44], ignore_index=True)
+
+    else:
+        df = df_linha44.copy()
+
+    df["UBS"] = ubs
+    df["Categoria"] = profissional
+
+    colunas = ["UBS", "Categoria"] + [
+        c for c in df.columns if c not in ["UBS", "Categoria"]
+    ]
+    df = df[colunas]
+
+    file_name = build_output_filename(
+        ubs=ubs,
+        profissional=profissional or "profissional_nao_informado",
+    )
+
+    return df, file_name
 
 
 def render_obter_data():
@@ -310,14 +508,14 @@ def render_obter_data():
 
         pagina = st.radio(
             "Ir para:",
-            ["Carregar CSV", "Carregar PDF"],
+            ["Carregar CSV/XLSX", "Carregar PDF"],
             key="menu_pagina",
         )
 
     if pagina == "Carregar PDF":
         return render_upload_pdf()
 
-    st.title("Carregar CSV")
+    st.title("Carregar CSV/XLSX")
 
     ubs = st.selectbox(
         "Selecione a UBS:",
@@ -344,9 +542,9 @@ def render_obter_data():
         aplicar_mensagem_profissional(profissional)
 
     upload = st.file_uploader(
-        label="Faça o upload do arquivo CSV",
-        type="csv",
-        key="csv_upload",
+        label="Faça o upload do arquivo CSV ou XLSX",
+        type=["csv", "xlsx", "xls"],
+        key="csv_xlsx_upload",
     )
 
     if upload is None:
@@ -362,87 +560,39 @@ def render_obter_data():
     try:
         upload.seek(0)
         raw_bytes = upload.read()
+        file_extension = get_file_extension(upload)
 
-        linhas = raw_bytes.splitlines()
-
-        if len(linhas) < 12:
-            st.error("O arquivo enviado não possui a estrutura mínima esperada.")
-            return None, None
-
-        linha_12 = linhas[11].decode("latin-1", errors="ignore")
-        is_acs = "ACS" in linha_12
-
-        upload_buffer = io.BytesIO(raw_bytes)
-
-        if tipo_relatorio == "Série histórica (relatório geral)":
-            df = pd.read_csv(
-                upload_buffer,
-                encoding="latin-1",
-                sep=";",
-                skiprows=19,
+        if file_extension == "csv":
+            df, file_name = ler_csv_tratado(
+                raw_bytes=raw_bytes,
+                tipo_relatorio=tipo_relatorio,
+                ubs=ubs,
+                profissional=profissional,
             )
 
-            df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
-            df["UBS"] = ubs
-
-            colunas = ["UBS"] + [c for c in df.columns if c != "UBS"]
-            df = df[colunas]
-
-            file_name = build_output_filename(
+        elif file_extension in ["xlsx", "xls"]:
+            df, file_name = ler_excel_tratado(
+                raw_bytes=raw_bytes,
+                tipo_relatorio=tipo_relatorio,
                 ubs=ubs,
-                profissional="serie_historica",
+                profissional=profissional,
             )
 
         else:
-            df = pd.read_csv(
-                upload_buffer,
-                encoding="latin-1",
-                sep=";",
-                skiprows=18,
-            )
+            st.error("Formato de arquivo não suportado. Envie CSV, XLSX ou XLS.")
+            return None, None
 
-            df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
-
-            if len(df) < 27:
-                st.error("O arquivo não possui linhas suficientes após o cabeçalho esperado.")
-                return None, None
-
-            df_linha44 = df.iloc[26:].copy()
-
-            if is_acs:
-                if "Tipo" not in df.columns:
-                    st.error("A coluna 'Tipo' não foi encontrada no arquivo.")
-                    return None, None
-
-                dfcadastro = df[df["Tipo"] == "Cadastro individual"].copy()
-                df = pd.concat([dfcadastro, df_linha44], ignore_index=True)
-
-            else:
-                df = df_linha44.copy()
-
-            df["UBS"] = ubs
-            df["Categoria"] = profissional
-
-            colunas = ["UBS", "Categoria"] + [
-                c for c in df.columns if c not in ["UBS", "Categoria"]
-            ]
-            df = df[colunas]
-
-            file_name = build_output_filename(
-                ubs=ubs,
-                profissional=profissional or "profissional_nao_informado",
-            )
+        if df is None or df.empty:
+            st.error("Nenhum dado válido foi encontrado no arquivo enviado.")
+            return None, None
 
         st.success("Dados carregados com sucesso!")
         st.dataframe(df, use_container_width=True)
 
-        # st.markdown("### Nome do arquivo tratado")
-        # st.code(file_name)
-
         return df, file_name
 
     except Exception as e:
-        st.error(f"Erro ao processar o arquivo CSV: {e}")
+        st.error(f"Erro ao processar o arquivo: {e}")
         return None, None
 
 
