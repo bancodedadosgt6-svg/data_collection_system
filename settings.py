@@ -1,29 +1,82 @@
 from __future__ import annotations
 
-import io
-import json
 import os
+from pathlib import Path
+from typing import Any
 
-import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
 
+# =========================================================
+# CARREGAMENTO DE AMBIENTE
+# =========================================================
+
 load_dotenv()
 
 
-APP_TITLE = "Sistema de Submissão de Dados em Saúde Alimentar"
-APP_SUBTITLE = "Aplicação de upload, tratamento e envio de dados para o Google Drive"
+# =========================================================
+# CAMINHOS DO PROJETO
+# =========================================================
 
-GOOGLE_DRIVE_SCOPES = [
-    "https://www.googleapis.com/auth/drive",
+BASE_DIR = Path(__file__).resolve().parent
+STYLE_FILE = BASE_DIR / "style.css"
+
+
+# =========================================================
+# IDENTIDADE DO SISTEMA
+# =========================================================
+
+APP_TITLE = "Sistema de Submissão de Dados em Saúde Alimentar"
+APP_SUBTITLE = "Tome bastante cuidado na submissão dos dados referênte a sua UBS!"
+
+
+# =========================================================
+# SUPABASE
+# =========================================================
+
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""
+
+
+# =========================================================
+# UBS OFICIAIS DO SISTEMA
+# =========================================================
+
+UBS_OPTIONS = [
+    "Gama",
+    "Santa Maria",
+    "Jardins Mangueiral",
 ]
 
+UBS_SLUGS = {
+    "Gama": "gama",
+    "Santa Maria": "santa_maria",
+    "Santa-Maria": "santa_maria",
+    "Jardins Mangueiral": "jardins_mangueiral",
+    "Jardins-Mangueiral": "jardins_mangueiral",
+    "Jardins-Mangueral": "jardins_mangueiral",
+}
 
-def get_secret_or_env(key: str, default=None):
+UBS_DISPLAY_NAMES = {
+    "gama": "Gama",
+    "santa_maria": "Santa Maria",
+    "jardins_mangueiral": "Jardins Mangueiral",
+}
+
+
+# =========================================================
+# FUNÇÕES DE CONFIGURAÇÃO
+# =========================================================
+
+def get_secret_or_env(key: str, default: Any = None) -> Any:
     """
     Busca primeiro no Streamlit Secrets e depois no .env.
-    Funciona localmente e no deploy.
+
+    Ordem:
+    1. st.secrets
+    2. variável de ambiente / .env
+    3. valor padrão
     """
     try:
         if key in st.secrets:
@@ -34,197 +87,192 @@ def get_secret_or_env(key: str, default=None):
     return os.getenv(key, default)
 
 
-GOOGLE_DRIVE_ENABLED = str(
-    get_secret_or_env("GOOGLE_DRIVE_ENABLED", "false")
-).lower() == "true"
-
-GOOGLE_OAUTH_CREDENTIALS_FILE = get_secret_or_env(
-    "GOOGLE_OAUTH_CREDENTIALS_FILE",
-    "credentials.json",
-)
-
-GOOGLE_OAUTH_TOKEN_FILE = get_secret_or_env(
-    "GOOGLE_OAUTH_TOKEN_FILE",
-    "token.json",
-)
-
-
-def load_css(css_file: str) -> None:
-    if not os.path.exists(css_file):
-        return
-
-    with open(css_file, "r", encoding="utf-8") as f:
-        st.markdown(
-            f"<style>{f.read()}</style>",
-            unsafe_allow_html=True,
-        )
-
-
-def get_secret_json(key: str) -> dict | None:
+def get_bool_secret_or_env(key: str, default: bool = False) -> bool:
     """
-    Lê JSON armazenado no secrets.toml como string multilinha.
-
-    Exemplo esperado:
-    GOOGLE_OAUTH_TOKEN_JSON = \"\"\"
-    { ... }
-    \"\"\"
+    Lê variável booleana de secrets/env.
+    Aceita: true, 1, yes, sim, on.
     """
-    try:
-        value = st.secrets.get(key)
-    except Exception:
-        return None
+    value = get_secret_or_env(key, str(default).lower())
 
-    if not value:
-        return None
-
-    if isinstance(value, dict):
-        return dict(value)
-
-    try:
-        return json.loads(str(value))
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"O segredo {key} não contém um JSON válido. "
-            f"Revise aspas, vírgulas e chaves no secrets.toml. Erro: {e}"
-        ) from e
-
-
-def load_json_file(file_path: str) -> dict | None:
-    """
-    Lê um arquivo JSON local, se existir.
-    """
-    if not os.path.exists(file_path):
-        return None
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_token_json_to_file(token_data: str) -> None:
-    """
-    Salva token.json localmente.
-    No deploy, normalmente o token vem de st.secrets.
-    """
-    with open(GOOGLE_OAUTH_TOKEN_FILE, "w", encoding="utf-8") as token_file:
-        token_file.write(token_data)
-
-
-@st.cache_resource(show_spinner=False)
-def get_google_drive_service():
-    """
-    Cria o serviço do Google Drive.
-
-    Prioridade:
-    1. Usa GOOGLE_OAUTH_TOKEN_JSON do Streamlit Secrets.
-    2. Usa token.json local, se existir.
-    3. Se não houver token válido, usa credentials.json local ou
-       GOOGLE_OAUTH_CREDENTIALS_JSON para abrir OAuth local.
-
-    No deploy, o ideal é já existir GOOGLE_OAUTH_TOKEN_JSON.
-    """
-    if not GOOGLE_DRIVE_ENABLED:
-        raise RuntimeError(
-            "Google Drive desabilitado. Configure GOOGLE_DRIVE_ENABLED=true."
-        )
-
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
-
-    creds = None
-
-    token_from_secrets = get_secret_json("GOOGLE_OAUTH_TOKEN_JSON")
-    credentials_from_secrets = get_secret_json("GOOGLE_OAUTH_CREDENTIALS_JSON")
-
-    if token_from_secrets:
-        creds = Credentials.from_authorized_user_info(
-            token_from_secrets,
-            GOOGLE_DRIVE_SCOPES,
-        )
-
-    elif os.path.exists(GOOGLE_OAUTH_TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(
-            GOOGLE_OAUTH_TOKEN_FILE,
-            GOOGLE_DRIVE_SCOPES,
-        )
-
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-
-    if not creds or not creds.valid:
-        if credentials_from_secrets:
-            flow = InstalledAppFlow.from_client_config(
-                credentials_from_secrets,
-                GOOGLE_DRIVE_SCOPES,
-            )
-
-        else:
-            if not os.path.exists(GOOGLE_OAUTH_CREDENTIALS_FILE):
-                raise FileNotFoundError(
-                    f"Arquivo de credenciais OAuth não encontrado: {GOOGLE_OAUTH_CREDENTIALS_FILE}. "
-                    "No local, coloque credentials.json na raiz. "
-                    "No deploy, configure GOOGLE_OAUTH_CREDENTIALS_JSON e "
-                    "GOOGLE_OAUTH_TOKEN_JSON nos secrets do Streamlit."
-                )
-
-            flow = InstalledAppFlow.from_client_secrets_file(
-                GOOGLE_OAUTH_CREDENTIALS_FILE,
-                GOOGLE_DRIVE_SCOPES,
-            )
-
-        creds = flow.run_local_server(
-            port=0,
-            prompt="consent",
-        )
-
-        save_token_json_to_file(creds.to_json())
-
-    service = build(
-        "drive",
-        "v3",
-        credentials=creds,
-    )
-
-    return service
-
-
-def upload_dataframe_to_drive(df: pd.DataFrame, file_name: str) -> str:
-    """
-    Função antiga mantida por compatibilidade.
-
-    O fluxo principal atual usa:
-    drive_database.alimentar_banco_xlsx_drive()
-    """
-    if df is None or df.empty:
-        raise ValueError("DataFrame vazio. Não há dados para enviar.")
-
-    service = get_google_drive_service()
-
-    from googleapiclient.http import MediaIoBaseUpload
-
-    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
-    file_stream = io.BytesIO(csv_bytes)
-
-    file_metadata = {
-        "name": file_name,
+    return str(value).strip().lower() in {
+        "true",
+        "1",
+        "yes",
+        "sim",
+        "on",
     }
 
-    media = MediaIoBaseUpload(
-        file_stream,
-        mimetype="text/csv",
-        resumable=False,
-    )
 
-    uploaded_file = (
-        service.files()
-        .create(
-            body=file_metadata,
-            media_body=media,
-            fields="id,name",
-            supportsAllDrives=True,
+def configure_supabase_settings() -> None:
+    """
+    Carrega as configurações do Supabase em variáveis globais.
+
+    Necessário no .env local ou no Streamlit Secrets:
+    SUPABASE_URL
+    SUPABASE_ANON_KEY
+    """
+    global SUPABASE_URL
+    global SUPABASE_ANON_KEY
+
+    SUPABASE_URL = str(get_secret_or_env("SUPABASE_URL", "")).strip()
+    SUPABASE_ANON_KEY = str(get_secret_or_env("SUPABASE_ANON_KEY", "")).strip()
+
+
+def validate_supabase_settings() -> None:
+    """
+    Valida se as configurações mínimas do Supabase foram informadas.
+    """
+    configure_supabase_settings()
+
+    missing = []
+
+    if not SUPABASE_URL:
+        missing.append("SUPABASE_URL")
+
+    if not SUPABASE_ANON_KEY:
+        missing.append("SUPABASE_ANON_KEY")
+
+    if missing:
+        missing_text = ", ".join(missing)
+        raise RuntimeError(
+            f"Configuração Supabase incompleta. Variáveis ausentes: {missing_text}. "
+            "Configure no arquivo .env local ou no Streamlit Secrets."
         )
-        .execute()
+
+
+def get_supabase_url() -> str:
+    """
+    Retorna a URL do projeto Supabase.
+    """
+    configure_supabase_settings()
+    return SUPABASE_URL
+
+
+def get_supabase_anon_key() -> str:
+    """
+    Retorna a anon public key do Supabase.
+    """
+    configure_supabase_settings()
+    return SUPABASE_ANON_KEY
+
+
+# Carrega as variáveis ao importar o arquivo.
+configure_supabase_settings()
+
+
+# =========================================================
+# UBS / NORMALIZAÇÃO
+# =========================================================
+
+def normalize_ubs_slug(value: str | None) -> str:
+    """
+    Normaliza o nome da UBS para o slug usado no banco.
+
+    Exemplos:
+    - Gama -> gama
+    - Santa Maria -> santa_maria
+    - Santa-Maria -> santa_maria
+    - Jardins-Mangueral -> jardins_mangueiral
+    """
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+
+    if not text:
+        return ""
+
+    if text in UBS_SLUGS:
+        return UBS_SLUGS[text]
+
+    normalized = (
+        text.lower()
+        .replace("ã", "a")
+        .replace("á", "a")
+        .replace("à", "a")
+        .replace("â", "a")
+        .replace("é", "e")
+        .replace("ê", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ô", "o")
+        .replace("õ", "o")
+        .replace("ú", "u")
+        .replace("ç", "c")
+        .replace("-", " ")
     )
 
-    return uploaded_file["name"]
+    normalized = "_".join(normalized.split())
+
+    aliases = {
+        "gama": "gama",
+        "santa_maria": "santa_maria",
+        "jardins_mangueiral": "jardins_mangueiral",
+        "jardins_mangueral": "jardins_mangueiral",
+    }
+
+    return aliases.get(normalized, normalized)
+
+
+def get_ubs_display_name(value: str | None) -> str:
+    """
+    Retorna o nome oficial da UBS para exibição.
+    """
+    slug = normalize_ubs_slug(value)
+
+    if not slug:
+        return ""
+
+    return UBS_DISPLAY_NAMES.get(slug, str(value).strip())
+
+
+def is_valid_ubs(value: str | None) -> bool:
+    """
+    Verifica se a UBS informada está entre as UBSs oficiais.
+    """
+    slug = normalize_ubs_slug(value)
+    return slug in UBS_DISPLAY_NAMES
+
+
+# =========================================================
+# CSS
+# =========================================================
+
+def load_css(css_file: str | Path = STYLE_FILE) -> None:
+    """
+    Carrega um arquivo CSS local e injeta no Streamlit.
+    """
+    css_path = Path(css_file)
+
+    if not css_path.is_absolute():
+        css_path = BASE_DIR / css_path
+
+    if not css_path.exists():
+        return
+
+    css = css_path.read_text(encoding="utf-8")
+
+    st.markdown(
+        f"<style>{css}</style>",
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# DEBUG / STATUS
+# =========================================================
+
+def get_environment_status() -> dict:
+    """
+    Retorna status básico do ambiente sem expor chaves sensíveis.
+    Útil para diagnóstico controlado.
+    """
+    configure_supabase_settings()
+
+    return {
+        "supabase_url_configurada": bool(SUPABASE_URL),
+        "supabase_anon_key_configurada": bool(SUPABASE_ANON_KEY),
+        "base_dir": str(BASE_DIR),
+        "style_file_existe": STYLE_FILE.exists(),
+        "ubs_disponiveis": UBS_OPTIONS,
+    }

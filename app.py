@@ -7,9 +7,15 @@ import pandas as pd
 import streamlit as st
 
 from acess import check_login, logout
-from drive_database import alimentar_banco_xlsx_drive
 from obter_data_csv import render_obter_data
-from settings import APP_TITLE, APP_SUBTITLE, load_css
+from settings import (
+    APP_SUBTITLE,
+    APP_TITLE,
+    get_ubs_display_name,
+    is_valid_ubs,
+    load_css,
+)
+from supabase_database import alimentar_banco_supabase
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -118,6 +124,32 @@ def aplicar_fundo_sistema() -> None:
             .main .block-container {{
                 padding-top: 4.5rem !important;
             }}
+
+            /*
+               Pequeno card visual da área de submissão.
+            */
+            .submit-card {{
+                background: rgba(235, 255, 242, 0.96);
+                border: 1px solid rgba(34, 197, 94, 0.18);
+                border-radius: 18px;
+                padding: 1.2rem 1.35rem;
+                box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }}
+
+            .submit-card-title {{
+                font-size: 1.15rem;
+                font-weight: 800;
+                color: #0f172a;
+                margin-bottom: 0.25rem;
+            }}
+
+            .submit-card-text {{
+                font-size: 0.92rem;
+                color: #334155;
+                margin-bottom: 0.2rem;
+            }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -133,9 +165,9 @@ def obter_ubs_destino(df_result: pd.DataFrame) -> str:
         raise ValueError("DataFrame vazio. Não foi possível identificar a UBS.")
 
     if "UBS" in df_result.columns:
-        ubs = df_result["UBS"].iloc[0]
+        ubs = df_result["UBS"].dropna().iloc[0]
     elif "ubs" in df_result.columns:
-        ubs = df_result["ubs"].iloc[0]
+        ubs = df_result["ubs"].dropna().iloc[0]
     else:
         raise ValueError(
             "Não foi possível identificar a coluna da UBS no dataframe tratado. "
@@ -147,48 +179,118 @@ def obter_ubs_destino(df_result: pd.DataFrame) -> str:
     if not ubs:
         raise ValueError("A UBS identificada está vazia.")
 
-    return ubs
+    ubs_display = get_ubs_display_name(ubs)
+
+    if not is_valid_ubs(ubs_display):
+        raise ValueError(
+            f"UBS inválida ou não cadastrada no sistema: {ubs}. "
+            "Verifique se a UBS está cadastrada no sistema."
+        )
+
+    return ubs_display
 
 
-def render_area_envio_drive(
+def render_resumo_dataframe(df_result: pd.DataFrame, ubs_destino: str) -> None:
+    """
+    Exibe um resumo mínimo dos dados tratados antes da submissão.
+    """
+    total_linhas = 0 if df_result is None else len(df_result)
+    total_colunas = 0 if df_result is None else len(df_result.columns)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("UBS identificada", ubs_destino)
+
+    with col2:
+        st.metric("Linhas tratadas", total_linhas)
+
+    with col3:
+        st.metric("Colunas", total_colunas)
+
+
+def render_area_envio_supabase(
     df_result: pd.DataFrame,
     file_name: str | None = None,
 ) -> None:
     """
-    Renderiza a área final de submissão dos dados tratados.
-    Interface limpa para o usuário final.
+    Renderiza a área final de submissão dos dados tratados para o Supabase.
     """
-    st.markdown("### Alimentação do banco da UBS")
+    st.markdown(
+        """
+        <div class="submit-card">
+            <div class="submit-card-title">Alimentação do banco da UBS</div>
+            <div class="submit-card-text">
+                Os dados tratados serão enviados e vinculados à UBS identificada no arquivo.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    try:
+        ubs_destino = obter_ubs_destino(df_result)
+    except Exception as e:
+        st.error(f"Erro na identificação da UBS: {e}")
+        return
 
     if file_name:
         st.caption(f"Arquivo tratado: {file_name}")
 
+    render_resumo_dataframe(
+        df_result=df_result,
+        ubs_destino=ubs_destino,
+    )
+
+    st.markdown("")
+
     if st.button(
         "Submeter dados",
         type="primary",
-        use_container_width=True,
+        width="stretch",
+        key="btn_submeter_dados_supabase",
     ):
         try:
-            ubs_destino = obter_ubs_destino(df_result)
-
-            with st.spinner("Submetendo dados..."):
-                resultado = alimentar_banco_xlsx_drive(
-                    df_novo=df_result,
-                    ubs=ubs_destino,
+            with st.spinner("Submetendo dados no banco..."):
+                resultado = alimentar_banco_supabase(
+                    df=df_result,
+                    ubs_nome=ubs_destino,
+                    arquivo_nome=file_name,
+                    tipo_relatorio=None,
+                    categoria_profissional=None,
                 )
 
-            st.success(f"Dados da UBS {resultado['ubs']} submetidos com sucesso!")
+            if resultado.get("linhas_inseridas", 0) > 0:
+                st.success(
+                    f"Dados da UBS {resultado['ubs']} enviados ao banco com sucesso!"
+                )
+            else:
+                st.warning(
+                    f"Nenhum dado novo foi inserido para a UBS {resultado['ubs']}. "
+                    "Os registros enviados já existiam no banco."
+                )
 
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric("Linhas anteriores", resultado["linhas_anteriores"])
+                st.metric("Linhas recebidas", resultado["linhas_recebidas"])
 
             with col2:
-                st.metric("Linhas novas", resultado["linhas_novas"])
+                st.metric("Linhas inseridas", resultado["linhas_inseridas"])
 
             with col3:
-                st.metric("Total atual", resultado["linhas_totais"])
+                st.metric("Duplicadas ignoradas", resultado["linhas_duplicadas"])
+
+            submissao_id = resultado.get("submissao_id")
+
+            if submissao_id:
+                st.caption(f"Submissão registrada: {submissao_id}")
+
+        except PermissionError as e:
+            st.error(
+                f"{e} "
+                "A próxima etapa necessária é adaptar o arquivo acess.py para autenticação via Supabase Auth."
+            )
 
         except Exception as e:
             st.error(f"Erro ao submeter dados: {e}")
@@ -215,7 +317,12 @@ def render_authenticated_bar(current_user: str | None) -> None:
         st.success(f"✔ Acesso liberado para: **{current_user}**")
 
     with top_col2:
-        if st.button("Sair", type="secondary", use_container_width=True):
+        if st.button(
+            "Sair",
+            type="secondary",
+            width="stretch",
+            key="btn_logout",
+        ):
             logout()
             st.rerun()
 
@@ -238,7 +345,7 @@ def main() -> None:
     df_result, file_name = render_obter_data()
 
     if df_result is not None and not df_result.empty:
-        render_area_envio_drive(
+        render_area_envio_supabase(
             df_result=df_result,
             file_name=file_name,
         )
