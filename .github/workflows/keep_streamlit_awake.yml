@@ -2,14 +2,53 @@ name: Keep Streamlit Awake
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    # A cada 1 hora, no minuto 23
+    - cron: "23 * * * *"
+
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-streamlit-awake
+  cancel-in-progress: true
 
 jobs:
   ping:
+    name: Ping Streamlit App
     runs-on: ubuntu-latest
+    timeout-minutes: 3
 
     steps:
-      - name: Acessar painel da PET 6
+      - name: Acessar painel PET 6
+        shell: bash
         run: |
-          curl -L --max-time 60 --retry 3 --retry-delay 10 "https://coleta-dados-pet6.streamlit.app/" || true
+          set -euo pipefail
+
+          URL="https://coleta-dados-pet6.streamlit.app/"
+
+          echo "Acessando: $URL"
+
+          STATUS_CODE=$(curl \
+            --silent \
+            --show-error \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            --user-agent "Mozilla/5.0 GitHubActions KeepAlive" \
+            --output /tmp/streamlit_response.html \
+            --write-out "%{http_code}" \
+            "$URL")
+
+          echo "Status HTTP: $STATUS_CODE"
+
+          if [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -ge 400 ]; then
+            echo "Falha ao acessar o Streamlit."
+            echo "Trecho da resposta:"
+            head -n 20 /tmp/streamlit_response.html || true
+            exit 1
+          fi
+
+          echo "Ping realizado com sucesso."
